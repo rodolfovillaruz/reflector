@@ -1,7 +1,27 @@
 import { AwsClient } from "aws4fetch";
 
+function timingSafeEqual(a, b) {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
 export default {
   async fetch(request, env) {
+    const token = request.headers.get("X-Auth-Token") ?? "";
+    if (!env.AUTH_TOKEN || !timingSafeEqual(token, env.AUTH_TOKEN)) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     const aws = new AwsClient({
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
