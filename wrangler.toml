@@ -1,0 +1,11 @@
+name = "reflector"
+main = "src/index.js"
+compatibility_date = "2026-08-23"
+
+routes = [
+  { pattern = "i.yes.ph", custom_domain = true }
+]
+
+[vars]
+AWS_REGION = "eu-north-1"
+AWS_INSTANCE_ID = "i-0b68cd07b0d4ff991"
