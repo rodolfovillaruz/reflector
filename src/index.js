@@ -12,6 +12,33 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ec2Request(aws, region, action, instanceId) {
+  const endpoint = `https://ec2.${region}.amazonaws.com/?Action=${action}&InstanceId.1=${instanceId}&Version=2016-11-15`;
+  const res = await aws.fetch(endpoint);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${action} failed: ${body}`);
+  }
+  return res.text();
+}
+
+async function describeInstance(aws, region, instanceId) {
+  const xml = await ec2Request(aws, region, "DescribeInstances", instanceId);
+  const stateMatch = xml.match(/<instanceState>[\s\S]*?<name>([^<]+)<\/name>/);
+  const ipMatch = xml.match(/<ipAddress>([^<]+)<\/ipAddress>/);
+  return {
+    state: stateMatch ? stateMatch[1] : null,
+    ip: ipMatch ? ipMatch[1] : null,
+  };
+}
+
+const POLL_INTERVAL_MS = 5000;
+const POLL_TIMEOUT_MS = 120000;
+
 export default {
   async fetch(request, env) {
     const token = request.headers.get("X-Auth-Token") ?? "";
@@ -29,30 +56,42 @@ export default {
       service: "ec2",
     });
 
-    const endpoint = `https://ec2.${env.AWS_REGION}.amazonaws.com/?Action=DescribeInstances&InstanceId.1=${env.AWS_INSTANCE_ID}&Version=2016-11-15`;
+    try {
+      let { state, ip } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID);
 
-    const res = await aws.fetch(endpoint);
-    if (!res.ok) {
-      const body = await res.text();
-      return new Response(JSON.stringify({ error: "AWS API request failed", detail: body }), {
+      if (state === "terminated" || state === "shutting-down") {
+        return new Response(JSON.stringify({ error: "instance is terminated", state }), {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (state === "stopped") {
+        await ec2Request(aws, env.AWS_REGION, "StartInstances", env.AWS_INSTANCE_ID);
+        state = "pending";
+      }
+
+      const deadline = Date.now() + POLL_TIMEOUT_MS;
+      while (state !== "running" && Date.now() < deadline) {
+        await sleep(POLL_INTERVAL_MS);
+        ({ state, ip } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID));
+      }
+
+      if (state !== "running" || !ip) {
+        return new Response(JSON.stringify({ error: "instance did not become reachable in time", state }), {
+          status: 504,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ ip }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "AWS API request failed", detail: String(err) }), {
         status: 502,
         headers: { "content-type": "application/json" },
       });
     }
-
-    const xml = await res.text();
-    const match = xml.match(/<ipAddress>([^<]+)<\/ipAddress>/);
-    const ip = match ? match[1] : null;
-
-    if (!ip) {
-      return new Response(JSON.stringify({ error: "public IP not found for instance" }), {
-        status: 404,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ ip }), {
-      headers: { "content-type": "application/json" },
-    });
   },
 };
