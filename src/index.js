@@ -56,6 +56,22 @@ export default {
       service: "ec2",
     });
 
+    const action = new URL(request.url).searchParams.get("action");
+
+    if (action === "status") {
+      try {
+        const { state, ip } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID);
+        return new Response(JSON.stringify({ state, ip }), {
+          headers: { "content-type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "AWS API request failed", detail: String(err) }), {
+          status: 502,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
     try {
       let { state, ip } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID);
 
