@@ -11,5 +11,5 @@ AWS_REGION = "eu-north-1"
 AWS_INSTANCE_ID = "i-0b68cd07b0d4ff991"
 # Google OAuth client ID(s) accepted as token audience, and who may sign in (comma-separated).
 # Both must be set for Google sign-in to work; empty means Google tokens are rejected.
-GOOGLE_CLIENT_IDS = ""
+GOOGLE_CLIENT_IDS = "289217185018-037ikt7c6omni6lfav2bl77rglvtbju8.apps.googleusercontent.com"
 ALLOWED_EMAILS = ""
