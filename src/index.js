@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { verifyGoogleIdToken } from "./google.js";
 
 function timingSafeEqual(a, b) {
   const encoder = new TextEncoder();
@@ -36,13 +37,27 @@ async function describeInstance(aws, region, instanceId) {
   };
 }
 
+// Accepts either a Google ID token (Authorization: Bearer ...) or the legacy shared X-Auth-Token.
+async function isAuthorized(request, env) {
+  const bearer = (request.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i);
+  if (bearer) {
+    try {
+      await verifyGoogleIdToken(bearer[1], env);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const token = request.headers.get("X-Auth-Token") ?? "";
+  return Boolean(env.AUTH_TOKEN) && timingSafeEqual(token, env.AUTH_TOKEN);
+}
+
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 120000;
 
 export default {
   async fetch(request, env) {
-    const token = request.headers.get("X-Auth-Token") ?? "";
-    if (!env.AUTH_TOKEN || !timingSafeEqual(token, env.AUTH_TOKEN)) {
+    if (!(await isAuthorized(request, env))) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401,
         headers: { "content-type": "application/json" },
