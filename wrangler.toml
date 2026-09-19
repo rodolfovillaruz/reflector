@@ -14,5 +14,5 @@ AWS_INSTANCE_ID = "i-0b68cd07b0d4ff991"
 GOOGLE_CLIENT_IDS = "289217185018-037ikt7c6omni6lfav2bl77rglvtbju8.apps.googleusercontent.com"
 # Client ID of the Google "Web application" OAuth client used by the /oauth/* routes.
 # Its secret is a Worker secret: wrangler secret put GOOGLE_CLIENT_SECRET
-GOOGLE_OAUTH_CLIENT_ID = ""
+GOOGLE_OAUTH_CLIENT_ID = "289217185018-kj2f56hjojd10tnjr61hscfsfcbke9vc.apps.googleusercontent.com"
 ALLOWED_EMAILS = "rodolfojr.villaruz@gmail.com"
