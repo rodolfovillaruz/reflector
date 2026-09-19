@@ -32,9 +32,11 @@ async function describeInstance(aws, region, instanceId) {
   const xml = await ec2Request(aws, region, "DescribeInstances", instanceId);
   const stateMatch = xml.match(/<instanceState>[\s\S]*?<name>([^<]+)<\/name>/);
   const ipMatch = xml.match(/<ipAddress>([^<]+)<\/ipAddress>/);
+  const nameMatch = xml.match(/<tagSet>[\s\S]*?<key>Name<\/key>\s*<value>([^<]*)<\/value>/);
   return {
     state: stateMatch ? stateMatch[1] : null,
     ip: ipMatch ? ipMatch[1] : null,
+    name: nameMatch ? nameMatch[1] : null,
   };
 }
 
@@ -81,8 +83,8 @@ export default {
 
     if (action === "status") {
       try {
-        const { state, ip } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID);
-        return new Response(JSON.stringify({ state, ip }), {
+        const { state, ip, name } = await describeInstance(aws, env.AWS_REGION, env.AWS_INSTANCE_ID);
+        return new Response(JSON.stringify({ state, ip, name }), {
           headers: { "content-type": "application/json" },
         });
       } catch (err) {
