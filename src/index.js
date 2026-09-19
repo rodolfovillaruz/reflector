@@ -1,5 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { verifyGoogleIdToken } from "./google.js";
+import { handleOAuth } from "./oauth.js";
 
 function timingSafeEqual(a, b) {
   const encoder = new TextEncoder();
@@ -42,7 +43,9 @@ async function isAuthorized(request, env) {
   const bearer = (request.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   if (bearer) {
     try {
-      await verifyGoogleIdToken(bearer[1], env);
+      // Tokens minted through the Worker's OAuth routes carry the web client's ID as audience.
+      const audiences = [env.GOOGLE_CLIENT_IDS, env.GOOGLE_OAUTH_CLIENT_ID].filter(Boolean).join(",");
+      await verifyGoogleIdToken(bearer[1], { ...env, GOOGLE_CLIENT_IDS: audiences });
       return true;
     } catch {
       return false;
@@ -57,6 +60,9 @@ const POLL_TIMEOUT_MS = 120000;
 
 export default {
   async fetch(request, env) {
+    const oauthResponse = await handleOAuth(request, env);
+    if (oauthResponse) return oauthResponse;
+
     if (!(await isAuthorized(request, env))) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401,
